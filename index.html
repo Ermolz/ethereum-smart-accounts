@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Технічна презентація про EIP-7702: делегований EOA, виконання коду, пакетні операції та межі відкату в Ethereum.">
+  <meta name="theme-color" content="#f3f2fa">
+  <link rel="icon" href="data:,">
+  <title>EIP-7702 — програмовані акаунти Ethereum</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+  <main class="deck" aria-label="Презентація про акаунти Ethereum та EIP-7702">
+    <section id="slide-1" class="slide cover" aria-labelledby="title-1" tabindex="-1">
+      <header class="masthead"><span class="brand">ETHEREUM</span><span class="chapter">EIP-7702</span><span class="timing">0:00–0:25</span></header>
+      <div class="cover-layout">
+        <div class="cover-copy">
+          <h1 id="title-1">«Третій тип»<br>акаунта?</h1>
+          <p class="cover-subtitle">Звичайний EOA.<br><strong>Делегований код.</strong><br>Та сама адреса.</p>
+          <p class="cover-correction">Точніше: нова можливість EOA<br>та новий тип транзакції <code>0x04</code>.</p>
+        </div>
+        <div class="account-figure" role="img" aria-label="У того самого EOA зберігаються адреса, баланс і сховище; поле коду отримує вказівник на реалізацію гаманця">
+          <div class="account-header"><span class="label">Акаунт користувача</span><span class="account-type">EOA</span></div>
+          <div class="account-address">0x71…a4F2</div>
+          <div class="account-row"><span>balance</span><span>зберігається</span></div>
+          <div class="account-row"><span>storage</span><span>контекст акаунта</span></div>
+          <div class="account-row code-row"><span>code</span><code>0xef0100 || D</code></div>
+          <div class="delegation-line"><span class="down-arrow" aria-hidden="true">↓</span><span>код за адресою D</span></div>
+          <div class="implementation"><span class="label">Реалізація гаманця</span><strong>execute(…)</strong></div>
+        </div>
+      </div>
+      <footer class="sources"><a href="https://eips.ethereum.org/EIPS/eip-7702" target="_blank" rel="noopener noreferrer">EIP-7702 · Final</a><span>Технічний огляд · 5 хвилин</span></footer>
+      <template class="speaker-notes"><p>Назва «третій тип» є зручним спрощенням. EIP-7702 дає EOA змогу делегувати виконання коду вже розгорнутому контракту. Адреса акаунта не змінюється. Специфікація визначає новий тип транзакції 0x04, а не новий набір полів акаунта.</p></template>
+    </section>
+
+    <section id="slide-2" class="slide" aria-labelledby="title-2" tabindex="-1" hidden inert>
+      <header class="masthead"><span class="brand">ETHEREUM</span><span class="chapter">Модель акаунта</span><span class="timing">0:25–1:05</span></header>
+      <h2 id="title-2">Ключ, код<br>і <span class="accent">право керування</span></h2>
+      <div class="slide-body">
+        <table class="account-comparison">
+          <caption class="sr-only">Порівняння звичайного EOA, контрактного акаунта та EOA з EIP-7702</caption>
+          <thead><tr><th scope="col">Модель</th><th scope="col">Виконувана логіка</th><th scope="col">Хто має повноваження</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">EOA<span>без делегування</span></th><td>Власного коду немає</td><td>Приватний ключ</td></tr>
+            <tr><th scope="row">Contract<span>контрактний акаунт</span></th><td>Код контракту</td><td>Правила в коді<br><span>наприклад, multisig</span></td></tr>
+            <tr class="highlight-row"><th scope="row">EOA + 7702<span>делегований EOA</span></th><td>Код реалізації D<br><span>у контексті EOA</span></td><td>Ключ зберігає контроль<br><span>додаткові правила — у коді D</span></td></tr>
+          </tbody>
+        </table>
+        <p class="takeaway"><span class="takeaway-line" aria-hidden="true"></span>«Smart account» описує програмовану поведінку.</p>
+      </div>
+      <footer class="sources"><a href="https://ethereum.org/developers/docs/accounts/" target="_blank" rel="noopener noreferrer">Ethereum · Accounts</a><a href="https://ethereum.org/roadmap/pectra/7702" target="_blank" rel="noopener noreferrer">EIP-7702 · керування ключем</a></footer>
+      <template class="speaker-notes"><p>У традиційній моделі EOA керується підписами приватного ключа, а контрактний акаунт — власним кодом. Контрактний гаманець теж може перевіряти підписи власників, але не має окремого приватного ключа, який напряму керує його адресою. Делегований EOA поєднує ключ і програмовану логіку. Компрометація кореневого ключа дозволяє змінити делегування.</p></template>
+    </section>
+
+    <section id="slide-3" class="slide" aria-labelledby="title-3" tabindex="-1" hidden inert>
+      <header class="masthead"><span class="brand">ETHEREUM</span><span class="chapter">Механізм</span><span class="timing">1:05–1:55</span></header>
+      <h2 id="title-3">Делегування коду</h2>
+      <div class="slide-body">
+        <div class="authorization"><span class="label">Власник підписує авторизацію</span><code>[chain_id, D, nonce, y_parity, r, s]</code><span class="authorization-note">Транзакція <code>0x04</code> містить <code>authorization_list</code></span></div>
+        <div class="mechanism" aria-label="Перевірити авторизацію, записати вказівник, виконати код у контексті EOA">
+          <div class="mechanism-step"><span class="step-number">01</span><h3>Перевірка</h3><p>Підпис, мережа,<br>nonce акаунта</p></div>
+          <span class="flow-arrow" aria-hidden="true">→</span>
+          <div class="mechanism-step"><span class="step-number">02</span><h3>Запис code</h3><p><code>0xef0100 || D</code><br><span class="muted">3 + 20 = 23 байти</span></p></div>
+          <span class="flow-arrow" aria-hidden="true">→</span>
+          <div class="mechanism-step"><span class="step-number">03</span><h3>Виконання</h3><p>Код D працює<br><strong>в контексті EOA</strong></p></div>
+        </div>
+        <p class="context-strip"><span>Адреса</span><span>Баланс</span><span>Сховище</span><strong>належать EOA</strong></p>
+      </div>
+      <footer class="sources"><a href="https://eips.ethereum.org/EIPS/eip-7702#specification" target="_blank" rel="noopener noreferrer">EIP-7702 · Specification</a></footer>
+      <template class="speaker-notes"><p>D — адреса контракту з реалізацією. Власник підписує авторизацію делегування, а зовнішню транзакцію може відправити інший акаунт. У code записується 23-байтовий індикатор. Виклик EOA виконує код за адресою D, проте address(this), баланс і сховище належать EOA. Це не копіювання сховища D. Підпис авторизації сам по собі не є дозволом на довільний swap: реалізація має окремо перевірити право виконати конкретні дії.</p></template>
+    </section>
+
+    <section id="slide-4" class="slide" aria-labelledby="title-4" tabindex="-1" hidden inert>
+      <header class="masthead"><span class="brand">ETHEREUM</span><span class="chapter">Приклад Uniswap</span><span class="timing">1:55–2:35</span></header>
+      <h2 id="title-4"><code>approve + swap</code><br><span class="accent">в одній транзакції</span></h2>
+      <div class="slide-body batch-layout">
+        <div class="batch-comparison">
+          <div class="batch-row"><span class="batch-label">Окремо</span><div class="transaction neutral"><span>Транзакція 1</span><code>approve</code></div><span class="flow-arrow" aria-hidden="true">→</span><div class="transaction neutral"><span>Транзакція 2</span><code>swap</code></div></div>
+          <div class="batch-row combined"><span class="batch-label">Пакет</span><div class="transaction-batch"><span>Одна транзакція · execute(batch)</span><div><code>approve</code><span aria-hidden="true">→</span><code>swap</code></div></div></div>
+        </div>
+        <div class="payer-note"><span class="label">Оплата газу</span><p>Відправником може бути <strong>спонсор</strong>.</p><p class="small">На рівні Ethereum газ оплачується в ETH.</p></div>
+        <p class="takeaway"><span class="takeaway-line" aria-hidden="true"></span>Атомарність пакета залежить від обробки помилок у коді гаманця.</p>
+      </div>
+      <footer class="sources"><a href="https://eips.ethereum.org/EIPS/eip-7702#motivation" target="_blank" rel="noopener noreferrer">EIP-7702 · Batching / Sponsorship</a><a href="https://blog.uniswap.org/smart-wallets-are-live" target="_blank" rel="noopener noreferrer">Uniswap · Smart wallets</a></footer>
+      <template class="speaker-notes"><p>Для випадку, коли allowance ще не вистачає, гаманець може об'єднати approve і swap. Це не означає, що будь-який swap завжди потребував двох транзакцій. В атомарній реалізації помилка swap поширюється назовні й відкочує approve. Якщо реалізація дозволяє часткове виконання, гарантія інша. Спонсор може заплатити ETH за газ і отримати ERC-20 як компенсацію; EIP-7702 сам не змінює протокольну валюту оплати газу.</p></template>
+    </section>
+
+    <section id="slide-5" class="slide" aria-labelledby="title-5" tabindex="-1" hidden inert>
+      <header class="masthead"><span class="brand">ETHEREUM</span><span class="chapter">Цілісність стану</span><span class="timing">2:35–3:25</span></header>
+      <h2 id="title-5">Що переживає <span class="accent">revert</span></h2>
+      <div class="slide-body">
+        <div class="revert-flow">
+          <div class="authorization-stage"><span class="label">Обробка авторизації</span><h3>Делегування<br>встановлено</h3><p>Валідний запис застосовано</p><div class="outcome persists"><span aria-hidden="true">✓</span> Зберігається</div></div>
+          <span class="flow-arrow" aria-hidden="true">→</span>
+          <div class="execution-stage"><span class="label">Виконання EVM</span><h3><code>approve → swap</code></h3><p>Помилка доходить до верху</p><div class="outcome reverted"><span aria-hidden="true">↶</span> Зміни виконання відкочуються</div></div>
+        </div>
+        <div class="persistence-note"><strong>Делегування не зникає після транзакції.</strong><span>Зміна або скасування потребує нової авторизації.</span></div>
+      </div>
+      <footer class="sources"><a href="https://eips.ethereum.org/EIPS/eip-7702#specification" target="_blank" rel="noopener noreferrer">EIP-7702 · обробка перед виконанням</a><a href="https://eips.ethereum.org/EIPS/eip-7702#persistence-of-code-delegation" target="_blank" rel="noopener noreferrer">Persistence of code delegation</a></footer>
+      <template class="speaker-notes"><p>Це ключова відмінність від надто загальної фрази «revert скасовує абсолютно все». Обробка authorization_list відбувається до фази виконання. Якщо валідна авторизація вже встановила делегування, наступний revert виконання не повертає попереднє делегування. Зміни виконання EVM відкочуються; витрачений газ не повертається повністю, nonce також не слід вважати незмінним. Для очищення делегування авторизують нульову адресу; сховище акаунта не очищується.</p></template>
+    </section>
+
+    <section id="slide-6" class="slide" aria-labelledby="title-6" tabindex="-1" hidden inert>
+      <header class="masthead"><span class="brand">ETHEREUM</span><span class="chapter">Межі механізму</span><span class="timing">3:25–4:25</span></header>
+      <h2 id="title-6">Програмованість<br>і <span class="accent">відповідальність коду</span></h2>
+      <div class="slide-body limits-layout">
+        <div class="standards">
+          <div class="standard"><strong>7702</strong><div><h3>Делегування коду EOA</h3><p>Зміна на рівні протоколу</p></div></div>
+          <div class="standard"><strong>4337</strong><div><h3>UserOperation → EntryPoint</h3><p>Окрема інфраструктура виконання</p></div></div>
+          <p class="compatible">Механізми можна поєднувати.</p>
+        </div>
+        <div class="responsibility"><h3>Реалізація перевіряє</h3><ul><li>Дозвіл на конкретні дії</li><li>Захист від повторного виконання</li><li>Обмеження повноважень</li></ul><p>Кореневий ключ зберігає<br><strong>право змінити делегування.</strong></p></div>
+      </div>
+      <footer class="sources"><a href="https://eips.ethereum.org/EIPS/eip-7702#security-considerations" target="_blank" rel="noopener noreferrer">EIP-7702 · Security considerations</a><a href="https://eips.ethereum.org/EIPS/eip-4337" target="_blank" rel="noopener noreferrer">ERC-4337 · Account abstraction</a></footer>
+      <template class="speaker-notes"><p>EIP-7702 і ERC-4337 вирішують різні задачі. Перший дає EOA делегований код, другий описує UserOperation, EntryPoint і пов'язану інфраструктуру. Їх можна поєднувати. Passkeys, ліміти, session keys чи спонсорування не з'являються автоматично від 23 байтів індикатора. Потрібна реалізація, що перевіряє право на конкретні дії, nonce операції та домен підпису. Перевірка tx.origin == msg.sender не є захистом від reentrancy і після 7702 тим більше не доводить відсутності коду у викликача.</p></template>
+    </section>
+
+    <section id="slide-7" class="slide closing" aria-labelledby="title-7" tabindex="-1" hidden inert>
+      <header class="masthead"><span class="brand">ETHEREUM</span><span class="chapter">Висновок</span><span class="timing">4:25–5:00</span></header>
+      <div class="closing-layout">
+        <h2 id="title-7">Та сама адреса.<br><span class="accent">Програмована поведінка.</span></h2>
+        <p class="closing-summary">EIP-7702 додає EOA делегований код.<br>Контроль ключем і перевірки реалізації<br>залишаються визначальними.</p>
+        <div class="timeline"><div><time datetime="2025-05-07">07.05.2025</time><h3>Pectra · Ethereum</h3><p>Активація EIP-7702</p></div><div><time datetime="2025-07-02">02.07.2025</time><h3>Uniswap</h3><p>Запуск підтримки smart wallets</p></div></div>
+      </div>
+      <footer class="sources"><a href="https://blog.ethereum.org/2025/04/23/pectra-mainnet" target="_blank" rel="noopener noreferrer">Ethereum Foundation · Pectra</a><a href="https://blog.uniswap.org/smart-wallets-are-live" target="_blank" rel="noopener noreferrer">Uniswap · анонс</a><span>Дати запусків: 2025 рік</span></footer>
+      <template class="speaker-notes"><p>Для захисту коректно сказати: «EIP-7702 розширює EOA делегованим кодом; назва “третій тип” є неформальною». Ethereum активував Pectra 7 травня 2025 року. Uniswap оголосив підтримку smart wallets 2 липня 2025 року. Дата нової статті не є датою запуску механізму. У зв'язку з Uniswap це розширення поведінки користувацького гаманця; воно не замінює інваріанти й перевірки оплати у контрактах пулів.</p></template>
+    </section>
+  </main>
+
+  <nav class="controls" aria-label="Керування презентацією">
+    <div class="progress-group"><span id="counter" class="counter" role="status" aria-live="polite" aria-atomic="true">01 / 07</span><progress id="progress" value="1" max="7" aria-label="Прогрес презентації">1 із 7</progress></div>
+    <div class="slide-dots" aria-label="Перехід до слайда">
+      <button type="button" data-slide="1" class="slide-dot" aria-label="Слайд 1: Третій тип акаунта" aria-current="step"></button>
+      <button type="button" data-slide="2" class="slide-dot" aria-label="Слайд 2: Ключ і код" aria-current="false"></button>
+      <button type="button" data-slide="3" class="slide-dot" aria-label="Слайд 3: Делегування" aria-current="false"></button>
+      <button type="button" data-slide="4" class="slide-dot" aria-label="Слайд 4: Approve і swap" aria-current="false"></button>
+      <button type="button" data-slide="5" class="slide-dot" aria-label="Слайд 5: Revert" aria-current="false"></button>
+      <button type="button" data-slide="6" class="slide-dot" aria-label="Слайд 6: Межі механізму" aria-current="false"></button>
+      <button type="button" data-slide="7" class="slide-dot" aria-label="Слайд 7: Висновок" aria-current="false"></button>
+    </div>
+    <button id="notes" class="nav-button utility" type="button" aria-haspopup="dialog" aria-label="Відкрити нотатки доповідача" title="Нотатки · N">Нотатки</button>
+    <button id="prev" class="nav-button" type="button" aria-label="Попередній слайд" title="Попередній · ← / Page Up" disabled>← <span>Назад</span></button>
+    <button id="next" class="nav-button primary" type="button" aria-label="Наступний слайд" title="Наступний · → / Space / Page Down"><span>Далі</span> →</button>
+    <button id="fullscreen" class="nav-button fullscreen" type="button" aria-label="Увімкнути повноекранний режим" aria-pressed="false" title="Повноекранний режим · F">⛶</button>
+  </nav>
+  <p class="keyboard-hint">← → <span>слайди</span><i>·</i> F <span>повний екран</span><i>·</i> N <span>нотатки</span></p>
+  <p id="notice" class="sr-only" role="status" aria-live="polite"></p>
+  <dialog id="notes-dialog" aria-labelledby="notes-heading">
+    <div class="dialog-top"><p class="label">Нотатки доповідача</p><button id="close-notes" class="nav-button" type="button" aria-label="Закрити нотатки">Закрити ×</button></div>
+    <h2 id="notes-heading"></h2><div id="notes-content"></div><p class="dialog-hint">Нотатки видно на цьому екрані · Esc — закрити</p>
+  </dialog>
+  <noscript><p class="noscript">Для перемикання слайдів увімкніть JavaScript. Без нього доступний перший слайд; друк показує всі слайди.</p></noscript>
+</body>
+</html>
