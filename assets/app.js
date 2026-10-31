@@ -13,6 +13,13 @@
   const notesHeading = document.getElementById('notes-heading');
   const notesContent = document.getElementById('notes-content');
   let current = 0;
+  let noticeTimer;
+
+  function showNotice(message) {
+    clearTimeout(noticeTimer);
+    notice.textContent = message;
+    noticeTimer = setTimeout(() => { notice.textContent = ''; }, 8000);
+  }
 
   function hashIndex() {
     const match = /^#slide-(\d+)$/.exec(location.hash);
@@ -53,9 +60,9 @@
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
       else if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
-      else notice.textContent = 'Цей браузер не підтримує повноекранний режим. Скористайтеся F11.';
+      else showNotice('Цей браузер не підтримує повноекранний режим. Скористайтеся F11.');
     } catch {
-      notice.textContent = 'Браузер не дозволив повноекранний режим. Скористайтеся F11.';
+      showNotice('Браузер не дозволив повноекранний режим. Скористайтеся F11.');
     }
   }
 
